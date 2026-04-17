@@ -237,6 +237,7 @@
       .sticker { height: 72px; }
     }
   
+    
     #loveText {
       z-index: 999;
     }
@@ -279,7 +280,7 @@
   </div>
   <div id="resetTimer" style="position:fixed; bottom:0; left:50%; transform:translateX(-50%); color:white; font-size:12px; opacity:0.8; margin-bottom:4px;"></div>
 
-  <!-- ПЛЕЕР (исправлен выбор и сброс) -->
+  <!-- ПЛЕЕР (MP3 из массива – теперь случайный выбор) -->
   <script>
     (function() {
       const playlist = [
@@ -308,9 +309,9 @@
 
       let playing = false;
       let currentAudio = null;
-      let currentTrackIndex = -1;  // -1 означает "не выбрано"
+      let currentTrackIndex = 0;
 
-      // Получить случайный индекс (можно исключить один)
+      // Генератор случайного индекса, исключая заданный (чтобы не повторять тот же трек)
       function getRandomTrackIndex(excludeIndex = -1) {
         if (playlist.length === 0) return -1;
         if (playlist.length === 1) return 0;
@@ -321,7 +322,7 @@
         return newIndex;
       }
 
-      // Цветы
+      // цветы (оставляем как было)
       const flowerEmojis = ['🌸', '🌷', '🌺', '💮', '🌼'];
       function createFlower() {
         const el = document.createElement('div');
@@ -344,58 +345,47 @@
         }
       }
 
-      // Запуск конкретного трека по индексу
-      function playTrack(index) {
+      function playNextTrack() {
         if (!playing) return;
-        if (index < 0 || index >= playlist.length) return;
-
-        stopCurrentAudio(); // гарантированно останавливаем предыдущий
-
-        const trackFile = playlist[index];
+        
+        // Выбираем случайный трек, исключая текущий (если длина > 1)
+        const nextIndex = getRandomTrackIndex(currentTrackIndex);
+        currentTrackIndex = nextIndex;
+        
+        const trackFile = playlist[currentTrackIndex];
         const audio = new Audio(trackFile);
         currentAudio = audio;
-        currentTrackIndex = index;
 
         audio.addEventListener('error', () => {
           if (playing) {
-            // Если ошибка — выбираем следующий случайный (исключая этот)
-            const nextIndex = getRandomTrackIndex(currentTrackIndex);
-            playTrack(nextIndex);
+            // При ошибке просто выбираем следующий случайный трек
+            playNextTrack();
+          } else {
+            stopCurrentAudio();
           }
         });
 
         audio.addEventListener('ended', () => {
           if (playing) {
-            // После окончания — следующий случайный (исключая текущий)
-            const nextIndex = getRandomTrackIndex(currentTrackIndex);
-            playTrack(nextIndex);
+            playNextTrack(); // следующий случайный трек
+          } else {
+            stopCurrentAudio();
           }
         });
 
         audio.play().catch(() => {
           if (playing) {
-            const nextIndex = getRandomTrackIndex(currentTrackIndex);
-            playTrack(nextIndex);
+            playNextTrack(); // если не удалось воспроизвести, пробуем другой
           }
         });
 
         hint.textContent = `🎵 ${trackFile.replace(/\.mp3$/i, '')}`;
       }
 
-      // Запуск следующего случайного трека (используется при старте или после остановки)
-      function playRandomTrack() {
-        if (!playing) return;
-        // При старте не исключаем ничего (т.к. currentTrackIndex может быть -1 или старый)
-        const nextIndex = getRandomTrackIndex(-1);
-        playTrack(nextIndex);
-      }
-
       function startPlaylist() {
-        if (playlist.length === 0) {
-          hint.textContent = 'плейлист пуст';
-          return;
-        }
-        playRandomTrack();
+        // Устанавливаем случайный начальный трек
+        currentTrackIndex = getRandomTrackIndex(-1);
+        playNextTrack();
       }
 
       function stopPlaylist() {
@@ -405,7 +395,7 @@
         heartBtn.setAttribute('aria-label', 'Включить музыку');
         hint.textContent = 'нажми на сердечко';
         stopCurrentAudio();
-        currentTrackIndex = -1; // сбрасываем, чтобы при новом старте не было ограничений
+        // currentTrackIndex не сбрасываем специально, чтобы при новом запуске не повторять тот же трек
       }
 
       heartBtn.addEventListener('click', () => {
@@ -414,13 +404,14 @@
           cassette.classList.add('playing');
           heartBtn.textContent = '❤';
           heartBtn.setAttribute('aria-label', 'Остановить музыку');
+          stopCurrentAudio(); // на всякий случай
           startPlaylist();
         } else {
           stopPlaylist();
         }
       });
 
-      // Письмо
+      // письмо (без изменений)
       const kiss = document.getElementById('kiss');
       const loveText = document.getElementById('loveText');
       kiss.onclick = (e) => {
@@ -433,7 +424,7 @@
     })();
   </script>
 
-  <!-- СЧЁТЧИКИ -->
+  <!-- СЧЁТЧИКИ (восстановлены, работают) -->
   <div style="position:fixed; bottom:40px; left:50%; transform:translateX(-50%); display:flex; gap:14px; z-index:2;">
     <button id="missBtn" style="display:flex; align-items:center; gap:6px; padding:10px 16px; border:none; border-radius:20px; background:rgba(255,77,136,0.15); color:#fff; font-size:14px; cursor:pointer; box-shadow:0 0 12px #ff4d88, 0 0 24px #ff2d95;">
       <span id="missCount">0</span> скучаю котик ❤
