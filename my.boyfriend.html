@@ -236,21 +236,14 @@
       .heart { width: 66px; height: 66px; font-size: 26px; }
       .sticker { height: 72px; }
     }
-  
-    
 
     #loveText {
       z-index: 999;
     }
-
-    
-  
-    
   </style>
 </head>
 <body>
   <div class="flowers" id="flowers"></div>
-  
 
   <div class="scene">
     <div style="text-align:center; margin-bottom:10px;">
@@ -284,157 +277,10 @@
 
     <div class="hint" id="hint">нажми на сердечко</div>
   </div>
+  
   <div id="resetTimer" style="position:fixed; bottom:0; left:50%; transform:translateX(-50%); color:white; font-size:12px; opacity:0.8; margin-bottom:4px;"></div>
 
-  <script>
-    const cassette = document.getElementById('cassette');
-    const heartBtn = document.getElementById('heartBtn');
-    const hint = document.getElementById('hint');
-    const flowers = document.getElementById('flowers');
-
-    let playing = false;
-    let audioContext = null;
-    let master = null;
-    let melodyTimer = null;
-    let bassTimer = null;
-
-    const flowerEmojis = ['🌸', '🌷', '🌺', '💮', '🌼'];
-
-    function createFlower() {
-      const el = document.createElement('div');
-      el.className = 'flower';
-      el.textContent = flowerEmojis[Math.floor(Math.random() * flowerEmojis.length)];
-      el.style.left = Math.random() * 100 + 'vw';
-      el.style.animationDuration = (3 + Math.random() * 5) + 's';
-      el.style.fontSize = (16 + Math.random() * 20) + 'px';
-      el.style.filter = `blur(${Math.random() * 0.4}px)`;
-      flowers.appendChild(el);
-      setTimeout(() => el.remove(), 8500);
-    }
-
-    setInterval(createFlower, 300);
-
-    function startAudio() {
-      if (!audioContext) {
-        const AC = window.AudioContext || window.webkitAudioContext;
-        audioContext = new AC();
-        master = audioContext.createGain();
-        master.gain.value = 0.06;
-        master.connect(audioContext.destination);
-      }
-
-      const unlock = audioContext.state === 'suspended' ? audioContext.resume() : Promise.resolve();
-      return unlock.then(() => {
-        const now = audioContext.currentTime;
-
-        const melody = [
-          [523.25, 0.22], [587.33, 0.22], [659.25, 0.28], [587.33, 0.22],
-          [523.25, 0.22], [494.88, 0.22], [440.00, 0.30], [523.25, 0.30]
-        ];
-
-        const bass = [
-          [130.81, 0.45], [174.61, 0.45], [196.00, 0.45], [174.61, 0.45]
-        ];
-
-        let mIndex = 0;
-        let bIndex = 0;
-
-        const playTone = (freq, duration, type = 'sine', gainValue = 0.5) => {
-          const osc = audioContext.createOscillator();
-          const gain = audioContext.createGain();
-          osc.type = type;
-          osc.frequency.value = freq;
-          gain.gain.setValueAtTime(0.0001, audioContext.currentTime);
-          gain.gain.exponentialRampToValueAtTime(gainValue, audioContext.currentTime + 0.03);
-          gain.gain.exponentialRampToValueAtTime(0.0001, audioContext.currentTime + duration);
-          osc.connect(gain);
-          gain.connect(master);
-          osc.start();
-          osc.stop(audioContext.currentTime + duration + 0.02);
-        };
-
-        function scheduleMelody() {
-          const [freq, dur] = melody[mIndex % melody.length];
-          playTone(freq, dur, 'triangle', 0.8);
-          mIndex++;
-        }
-
-        function scheduleBass() {
-          const [freq, dur] = bass[bIndex % bass.length];
-          playTone(freq, dur, 'sine', 0.45);
-          bIndex++;
-        }
-
-        scheduleMelody();
-        scheduleBass();
-        melodyTimer = setInterval(scheduleMelody, 260);
-        bassTimer = setInterval(scheduleBass, 480);
-      });
-    }
-
-    function stopAudio() {
-      if (melodyTimer) {
-        clearInterval(melodyTimer);
-        melodyTimer = null;
-      }
-      if (bassTimer) {
-        clearInterval(bassTimer);
-        bassTimer = null;
-      }
-      if (audioContext && audioContext.state !== 'closed') {
-        audioContext.close();
-      }
-      audioContext = null;
-      master = null;
-    }
-
-    heartBtn.addEventListener('click', async () => {
-      playing = !playing;
-      cassette.classList.toggle('playing', playing);
-      heartBtn.textContent = playing ? '❤' : '♡';
-      heartBtn.setAttribute('aria-label', playing ? 'Остановить музыку' : 'Включить музыку');
-      hint.textContent = playing
-        ? 'играют песни для тебя мой милый'
-        : 'нажми на сердечко';
-
-      if (playing) {
-        try {
-          await startAudio();
-        } catch (e) {
-          playing = false;
-          cassette.classList.remove('playing');
-          heartBtn.textContent = '♡';
-          hint.textContent = 'Не удалось запустить звук в этом браузере.';
-        }
-      } else {
-        stopAudio();
-      }
-    });
-  const kiss = document.getElementById('kiss');
-
-const loveText = document.getElementById('loveText');
-
-kiss.onclick = (e) => {
-  e.stopPropagation();
-  
-  loveText.style.display = 'block';
-  loveText.textContent = "Добавила в эту кассету песни… Теперь каждая из них ассоциируется только с тобой. Когда слышу — вспоминаю наши встречи. Те самые, которых мы так долго ждали, потому что мы не рядом, но сердцем — всегда друг к другу... Люблю тебя нежно. И очень-очень скучаю.";
-};
-
-// скрытие при клике в любом месте
-document.addEventListener('click', () => {
-  loveText.style.display = 'none';
-  
-});
-
-// чтобы клик по самому тексту не закрывал его
-loveText.addEventListener('click', (e) => {
-  e.stopPropagation();
-});
-
-</script>
-    <div style="position:fixed; bottom:40px; left:50%; transform:translateX(-50%); display:flex; gap:14px; z-index:2;">
-
+  <div style="position:fixed; bottom:40px; left:50%; transform:translateX(-50%); display:flex; gap:14px; z-index:2;">
     <button id="missBtn" style="display:flex; align-items:center; gap:6px; padding:10px 16px; border:none; border-radius:20px; background:rgba(255,77,136,0.15); color:#fff; font-size:14px; cursor:pointer; box-shadow:0 0 12px #ff4d88, 0 0 24px #ff2d95;">
       <span id="missCount">0</span> скучаю котик ❤
     </button>
@@ -442,83 +288,210 @@ loveText.addEventListener('click', (e) => {
     <button id="loveBtn" style="padding:10px 16px; border:none; border-radius:20px; background:rgba(255,77,136,0.15); color:white; font-size:14px; cursor:pointer; box-shadow:0 0 12px #ff4d88, 0 0 24px #ff2d95;">
       люблю тебя ❤
     </button>
-
   </div>
 
   <script>
-    const missBtn = document.getElementById('missBtn');
-    const missCount = document.getElementById('missCount');
-    const loveBtn = document.getElementById('loveBtn');
-    const loveCountEl = document.createElement('span');
-    loveCountEl.style.marginLeft = '6px';
-    loveBtn.appendChild(loveCountEl);
+    (function() {
+      // ---------- ЦВЕТЫ ----------
+      const flowers = document.getElementById('flowers');
+      const flowerEmojis = ['🌸', '🌷', '🌺', '💮', '🌼'];
 
-    let count = 0;
-    let loveCount = 0;
-
-    // загрузка love счетчика
-    const savedLove = JSON.parse(localStorage.getItem('loveData'));
-    if (savedLove) {
-      const lastResetLove = new Date(savedLove.reset);
-      const diffDaysLove = (new Date() - lastResetLove) / (1000 * 60 * 60 * 24);
-      if (diffDaysLove < 7) {
-        loveCount = savedLove.count;
+      function createFlower() {
+        const el = document.createElement('div');
+        el.className = 'flower';
+        el.textContent = flowerEmojis[Math.floor(Math.random() * flowerEmojis.length)];
+        el.style.left = Math.random() * 100 + 'vw';
+        el.style.animationDuration = (3 + Math.random() * 5) + 's';
+        el.style.fontSize = (16 + Math.random() * 20) + 'px';
+        el.style.filter = `blur(${Math.random() * 0.4}px)`;
+        flowers.appendChild(el);
+        setTimeout(() => el.remove(), 8500);
       }
-    }
-    loveCountEl.textContent = loveCount;
+      setInterval(createFlower, 300);
 
-    // загрузка из localStorage
-    const saved = JSON.parse(localStorage.getItem('missData'));
-    const now = new Date();
+      // ---------- АУДИО: MP3 ПЛЕЙЛИСТ ----------
+      // 👇 ЗАМЕНИТЕ НА СВОИ ФАЙЛЫ (локальные .mp3)
+      const playlist = [
+        'song1.mp3',
+        'song2.mp3',
+        'song3.mp3'
+      ];
 
-    if (saved) {
-      const lastReset = new Date(saved.reset);
-      const diffDays = (now - lastReset) / (1000 * 60 * 60 * 24);
+      const cassette = document.getElementById('cassette');
+      const heartBtn = document.getElementById('heartBtn');
+      const hint = document.getElementById('hint');
 
-      if (diffDays < 7) {
-        count = saved.count;
+      let playing = false;
+      let audioElement = null;           // текущий Audio элемент
+      let currentIndex = 0;              // индекс текущего трека
+
+      // Обработчик окончания трека — переключает на следующий
+      function onTrackEnded() {
+        if (!playing) return; // если пауза, не переключаем автоматически
+        currentIndex = (currentIndex + 1) % playlist.length;
+        playCurrentTrack();
       }
-    }
 
-    missCount.textContent = count;
+      // Воспроизведение трека по currentIndex
+      function playCurrentTrack() {
+        if (!audioElement) {
+          audioElement = new Audio();
+          audioElement.addEventListener('ended', onTrackEnded);
+        }
+        audioElement.src = playlist[currentIndex];
+        audioElement.play().catch(err => {
+          console.warn('Ошибка воспроизведения:', err);
+          // если не удалось — останавливаем всё
+          playing = false;
+          cassette.classList.remove('playing');
+          heartBtn.textContent = '♡';
+          heartBtn.setAttribute('aria-label', 'Включить музыку');
+          hint.textContent = 'Не удалось воспроизвести файл';
+        });
+      }
 
-    function updateResetTimer() {
-      const data = JSON.parse(localStorage.getItem('missData'));
-      if (!data) return;
-      const resetDate = new Date(data.reset);
-      const nextReset = new Date(resetDate.getTime() + 7*24*60*60*1000);
-      const now = new Date();
-      const diff = nextReset - now;
-      if (diff <= 0) return;
+      // Запуск плеера (с первого трека, если не играет)
+      function startAudio() {
+        if (audioElement) {
+          // если уже есть элемент — сбрасываем на начало плейлиста
+          audioElement.pause();
+          audioElement.removeEventListener('ended', onTrackEnded);
+          audioElement = null;
+        }
+        currentIndex = 0;
+        audioElement = new Audio();
+        audioElement.addEventListener('ended', onTrackEnded);
+        audioElement.src = playlist[currentIndex];
+        return audioElement.play();
+      }
 
-      const hours = Math.floor(diff / (1000*60*60));
-      const mins = Math.floor((diff % (1000*60*60)) / (1000*60));
+      // Остановка (пауза)
+      function stopAudio() {
+        if (audioElement) {
+          audioElement.pause();
+          // не сбрасываем currentTime, чтобы при следующем play продолжить с того же места
+        }
+      }
 
-      document.getElementById('resetTimer').textContent = 'сброс через: ' + hours + 'ч ' + mins + 'м';
-    }
+      // ---------- КНОПКА СЕРДЦА ----------
+      heartBtn.addEventListener('click', async () => {
+        playing = !playing;
+        cassette.classList.toggle('playing', playing);
+        heartBtn.textContent = playing ? '❤' : '♡';
+        heartBtn.setAttribute('aria-label', playing ? 'Остановить музыку' : 'Включить музыку');
+        hint.textContent = playing
+          ? 'играют песни для тебя мой милый'
+          : 'нажми на сердечко';
 
-    setInterval(updateResetTimer, 60000);
-    updateResetTimer();
+        if (playing) {
+          try {
+            // Если уже есть audioElement и он на паузе — продолжаем
+            if (audioElement && audioElement.paused) {
+              await audioElement.play();
+            } else {
+              await startAudio();
+            }
+          } catch (e) {
+            playing = false;
+            cassette.classList.remove('playing');
+            heartBtn.textContent = '♡';
+            hint.textContent = 'Не удалось запустить звук';
+            console.warn(e);
+          }
+        } else {
+          stopAudio();
+        }
+      });
 
-    missBtn.onclick = () => {
-      count++;
-      missCount.textContent = count;
+      // ---------- СООБЩЕНИЕ ПРИ КЛИКЕ НА КОНВЕРТ ----------
+      const kiss = document.getElementById('kiss');
+      const loveText = document.getElementById('loveText');
 
-      localStorage.setItem('missData', JSON.stringify({
-        count: count,
-        reset: new Date()
-      }));
-    };
+      kiss.onclick = (e) => {
+        e.stopPropagation();
+        loveText.style.display = 'block';
+        loveText.textContent = "Добавила в эту кассету песни… Теперь каждая из них ассоциируется только с тобой. Когда слышу — вспоминаю наши встречи. Те самые, которых мы так долго ждали, потому что мы не рядом, но сердцем — всегда друг к другу... Люблю тебя нежно. И очень-очень скучаю.";
+      };
 
-    loveBtn.onclick = () => {
-      loveCount++;
+      document.addEventListener('click', () => {
+        loveText.style.display = 'none';
+      });
+
+      loveText.addEventListener('click', (e) => {
+        e.stopPropagation();
+      });
+
+      // ---------- СЧЁТЧИКИ (СКУЧАЮ / ЛЮБЛЮ) ----------
+      const missBtn = document.getElementById('missBtn');
+      const missCount = document.getElementById('missCount');
+      const loveBtn = document.getElementById('loveBtn');
+      const loveCountEl = document.createElement('span');
+      loveCountEl.style.marginLeft = '6px';
+      loveBtn.appendChild(loveCountEl);
+
+      let count = 0;
+      let loveCount = 0;
+
+      // загрузка love счётчика
+      const savedLove = JSON.parse(localStorage.getItem('loveData'));
+      if (savedLove) {
+        const lastResetLove = new Date(savedLove.reset);
+        const diffDaysLove = (new Date() - lastResetLove) / (1000 * 60 * 60 * 24);
+        if (diffDaysLove < 7) {
+          loveCount = savedLove.count;
+        }
+      }
       loveCountEl.textContent = loveCount;
 
-      localStorage.setItem('loveData', JSON.stringify({
-        count: loveCount,
-        reset: new Date()
-      }));
-    };
+      // загрузка miss счётчика
+      const saved = JSON.parse(localStorage.getItem('missData'));
+      const now = new Date();
+
+      if (saved) {
+        const lastReset = new Date(saved.reset);
+        const diffDays = (now - lastReset) / (1000 * 60 * 60 * 24);
+        if (diffDays < 7) {
+          count = saved.count;
+        }
+      }
+      missCount.textContent = count;
+
+      function updateResetTimer() {
+        const data = JSON.parse(localStorage.getItem('missData'));
+        if (!data) return;
+        const resetDate = new Date(data.reset);
+        const nextReset = new Date(resetDate.getTime() + 7*24*60*60*1000);
+        const now = new Date();
+        const diff = nextReset - now;
+        if (diff <= 0) return;
+
+        const hours = Math.floor(diff / (1000*60*60));
+        const mins = Math.floor((diff % (1000*60*60)) / (1000*60));
+        document.getElementById('resetTimer').textContent = 'сброс через: ' + hours + 'ч ' + mins + 'м';
+      }
+
+      setInterval(updateResetTimer, 60000);
+      updateResetTimer();
+
+      missBtn.onclick = () => {
+        count++;
+        missCount.textContent = count;
+        localStorage.setItem('missData', JSON.stringify({
+          count: count,
+          reset: new Date()
+        }));
+      };
+
+      loveBtn.onclick = () => {
+        loveCount++;
+        loveCountEl.textContent = loveCount;
+        localStorage.setItem('loveData', JSON.stringify({
+          count: loveCount,
+          reset: new Date()
+        }));
+      };
+
+    })();
   </script>
 </body>
 </html>
