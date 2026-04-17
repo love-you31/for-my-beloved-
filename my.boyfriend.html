@@ -280,9 +280,9 @@
   </div>
   <div id="resetTimer" style="position:fixed; bottom:0; left:50%; transform:translateX(-50%); color:white; font-size:12px; opacity:0.8; margin-bottom:4px;"></div>
 
+  <!-- ПЛЕЕР (MP3 из массива по очереди) -->
   <script>
-    (function(){
-      // --- плейлист (локальные файлы) ---
+    (function() {
       const playlist = [
         'Каспийский Груз - Любовь HD1080.mp3',
         'GONE.Fludd & M00NCHILD - Рядом С Тобой.mp3',
@@ -302,19 +302,16 @@
         'squirrel-flower_-_conditions.mp3'
       ];
 
-      // --- элементы ---
       const cassette = document.getElementById('cassette');
       const heartBtn = document.getElementById('heartBtn');
       const hint = document.getElementById('hint');
       const flowers = document.getElementById('flowers');
 
-      // --- состояние плеера ---
-      let playing = false;               // крутятся ли катушки
-      let currentAudio = null;           // текущий Audio объект
-      let currentTrackIndex = 0;         // индекс в playlist
-      let nextTrackTimer = null;         // таймер для автоматического переключения (если вдруг понадобится)
+      let playing = false;
+      let currentAudio = null;
+      let currentTrackIndex = 0;
 
-      // --- цветочки (оставляем как было) ---
+      // цветы (оставляем как было)
       const flowerEmojis = ['🌸', '🌷', '🌺', '💮', '🌼'];
       function createFlower() {
         const el = document.createElement('div');
@@ -329,49 +326,25 @@
       }
       setInterval(createFlower, 300);
 
-      // --- очистка аудио при остановке ---
       function stopCurrentAudio() {
         if (currentAudio) {
           currentAudio.pause();
           currentAudio.currentTime = 0;
           currentAudio = null;
         }
-        if (nextTrackTimer) {
-          clearTimeout(nextTrackTimer);
-          nextTrackTimer = null;
-        }
       }
 
-      // --- запуск следующего трека (или остановка если конец) ---
       function playNextTrack() {
-        // если мы не в режиме playing — не продолжаем
         if (!playing) return;
-
-        // если дошли до конца плейлиста — начинаем заново (зацикливаем)
         if (currentTrackIndex >= playlist.length) {
           currentTrackIndex = 0;
         }
 
         const trackFile = playlist[currentTrackIndex];
-        if (!trackFile) {
-          // если пусто — выключаем
-          playing = false;
-          cassette.classList.remove('playing');
-          heartBtn.textContent = '♡';
-          heartBtn.setAttribute('aria-label', 'Включить музыку');
-          hint.textContent = 'нажми на сердечко';
-          stopCurrentAudio();
-          return;
-        }
-
-        // создаём новый Audio
         const audio = new Audio(trackFile);
         currentAudio = audio;
 
-        // обработка ошибок (если файл не найден)
-        audio.addEventListener('error', (e) => {
-          console.warn('Ошибка загрузки трека:', trackFile);
-          // переходим к следующему, но только если playing всё ещё true
+        audio.addEventListener('error', () => {
           if (playing) {
             currentTrackIndex++;
             playNextTrack();
@@ -380,7 +353,6 @@
           }
         });
 
-        // когда трек заканчивается — включаем следующий
         audio.addEventListener('ended', () => {
           if (playing) {
             currentTrackIndex++;
@@ -390,33 +362,21 @@
           }
         });
 
-        // начинаем воспроизведение
-        audio.play().catch(err => {
-          console.warn('Ошибка воспроизведения:', err);
-          // возможно, автовоспроизведение заблокировано, но у нас есть жест пользователя
-          // попробуем всё равно переключиться
+        audio.play().catch(() => {
           if (playing) {
             currentTrackIndex++;
             playNextTrack();
-          } else {
-            stopCurrentAudio();
           }
         });
 
-        // обновим подсказку с названием трека (опционально)
-        const fileName = trackFile.replace(/\.mp3$/i, '');
-        hint.textContent = `🎵 ${fileName}`;
+        hint.textContent = `🎵 ${trackFile.replace(/\.mp3$/i, '')}`;
       }
 
-      // --- запуск воспроизведения с первого трека ---
       function startPlaylist() {
-        // сбрасываем индекс на начало
         currentTrackIndex = 0;
-        // запускаем первый трек
         playNextTrack();
       }
 
-      // --- полная остановка плеера ---
       function stopPlaylist() {
         playing = false;
         cassette.classList.remove('playing');
@@ -424,50 +384,47 @@
         heartBtn.setAttribute('aria-label', 'Включить музыку');
         hint.textContent = 'нажми на сердечко';
         stopCurrentAudio();
-        // индекс не сбрасываем — при следующем Play начнём сначала? 
-        // по условию "по очереди" — лучше начинать с первого. 
-        // но если хотим продолжать — можно оставить, но для простоты сбросим:
         currentTrackIndex = 0;
       }
 
-      // --- обработчик кнопки-сердечка ---
-      heartBtn.addEventListener('click', async () => {
+      heartBtn.addEventListener('click', () => {
         if (!playing) {
-          // включаем
           playing = true;
           cassette.classList.add('playing');
           heartBtn.textContent = '❤';
           heartBtn.setAttribute('aria-label', 'Остановить музыку');
-          
-          // если уже есть аудио (например, пауза) — лучше остановить и начать заново
           stopCurrentAudio();
-          // начинаем с первого трека
           startPlaylist();
         } else {
-          // выключаем
           stopPlaylist();
         }
       });
 
-      // --- всё остальное (письмо, счётчики) без изменений ---
+      // письмо (без изменений)
       const kiss = document.getElementById('kiss');
       const loveText = document.getElementById('loveText');
-
       kiss.onclick = (e) => {
         e.stopPropagation();
         loveText.style.display = 'block';
         loveText.textContent = "Добавила в эту кассету песни… Теперь каждая из них ассоциируется только с тобой. Когда слышу — вспоминаю наши встречи. Те самые, которых мы так долго ждали, потому что мы не рядом, но сердцем — всегда друг к другу... Люблю тебя нежно. И очень-очень скучаю.";
       };
+      document.addEventListener('click', () => { loveText.style.display = 'none'; });
+      loveText.addEventListener('click', (e) => e.stopPropagation());
+    })();
+  </script>
 
-      document.addEventListener('click', () => {
-        loveText.style.display = 'none';
-      });
+  <!-- СЧЁТЧИКИ (восстановлены, работают) -->
+  <div style="position:fixed; bottom:40px; left:50%; transform:translateX(-50%); display:flex; gap:14px; z-index:2;">
+    <button id="missBtn" style="display:flex; align-items:center; gap:6px; padding:10px 16px; border:none; border-radius:20px; background:rgba(255,77,136,0.15); color:#fff; font-size:14px; cursor:pointer; box-shadow:0 0 12px #ff4d88, 0 0 24px #ff2d95;">
+      <span id="missCount">0</span> скучаю котик ❤
+    </button>
+    <button id="loveBtn" style="padding:10px 16px; border:none; border-radius:20px; background:rgba(255,77,136,0.15); color:white; font-size:14px; cursor:pointer; box-shadow:0 0 12px #ff4d88, 0 0 24px #ff2d95;">
+      люблю тебя ❤
+    </button>
+  </div>
 
-      loveText.addEventListener('click', (e) => {
-        e.stopPropagation();
-      });
-
-      // --- счётчики (как были) ---
+  <script>
+    (function() {
       const missBtn = document.getElementById('missBtn');
       const missCount = document.getElementById('missCount');
       const loveBtn = document.getElementById('loveBtn');
@@ -490,7 +447,6 @@
 
       const saved = JSON.parse(localStorage.getItem('missData'));
       const now = new Date();
-
       if (saved) {
         const lastReset = new Date(saved.reset);
         const diffDays = (now - lastReset) / (1000 * 60 * 60 * 24);
@@ -518,31 +474,15 @@
       missBtn.onclick = () => {
         count++;
         missCount.textContent = count;
-        localStorage.setItem('missData', JSON.stringify({
-          count: count,
-          reset: new Date()
-        }));
+        localStorage.setItem('missData', JSON.stringify({ count, reset: new Date() }));
       };
 
       loveBtn.onclick = () => {
         loveCount++;
         loveCountEl.textContent = loveCount;
-        localStorage.setItem('loveData', JSON.stringify({
-          count: loveCount,
-          reset: new Date()
-        }));
+        localStorage.setItem('loveData', JSON.stringify({ count: loveCount, reset: new Date() }));
       };
     })();
   </script>
-
-  <!-- кнопки "скучаю" и "люблю" остались в разметке как были -->
-  <div style="position:fixed; bottom:40px; left:50%; transform:translateX(-50%); display:flex; gap:14px; z-index:2;">
-    <button id="missBtn" style="display:flex; align-items:center; gap:6px; padding:10px 16px; border:none; border-radius:20px; background:rgba(255,77,136,0.15); color:#fff; font-size:14px; cursor:pointer; box-shadow:0 0 12px #ff4d88, 0 0 24px #ff2d95;">
-      <span id="missCount">0</span> скучаю котик ❤
-    </button>
-    <button id="loveBtn" style="padding:10px 16px; border:none; border-radius:20px; background:rgba(255,77,136,0.15); color:white; font-size:14px; cursor:pointer; box-shadow:0 0 12px #ff4d88, 0 0 24px #ff2d95;">
-      люблю тебя ❤
-    </button>
-  </div>
 </body>
-  </html>
+</html>
