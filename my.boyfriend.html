@@ -237,7 +237,6 @@
       .sticker { height: 72px; }
     }
   
-    
     #loveText {
       z-index: 999;
     }
@@ -280,7 +279,7 @@
   </div>
   <div id="resetTimer" style="position:fixed; bottom:0; left:50%; transform:translateX(-50%); color:white; font-size:12px; opacity:0.8; margin-bottom:4px;"></div>
 
-  <!-- ПЛЕЕР (исправлено наложение треков) -->
+  <!-- ПЛЕЕР (случайный выбор, без наложений) -->
   <script>
     (function() {
       const playlist = [
@@ -311,7 +310,7 @@
       let currentAudio = null;
       let currentTrackIndex = 0;
 
-      // Генератор случайного индекса, исключая заданный
+      // Генератор случайного индекса, исключая заданный (чтобы не повторять подряд)
       function getRandomTrackIndex(excludeIndex = -1) {
         if (playlist.length === 0) return -1;
         if (playlist.length === 1) return 0;
@@ -322,7 +321,7 @@
         return newIndex;
       }
 
-      // цветы
+      // Анимация падающих цветов
       const flowerEmojis = ['🌸', '🌷', '🌺', '💮', '🌼'];
       function createFlower() {
         const el = document.createElement('div');
@@ -337,6 +336,7 @@
       }
       setInterval(createFlower, 300);
 
+      // Остановка текущего аудио
       function stopCurrentAudio() {
         if (currentAudio) {
           currentAudio.pause();
@@ -345,13 +345,13 @@
         }
       }
 
+      // Запуск следующего случайного трека
       function playNextTrack() {
         if (!playing) return;
 
-        // Останавливаем предыдущий трек перед запуском нового
+        // Сначала останавливаем предыдущий трек (важно для избежания наложений)
         stopCurrentAudio();
 
-        // Выбираем случайный трек, исключая текущий
         const nextIndex = getRandomTrackIndex(currentTrackIndex);
         currentTrackIndex = nextIndex;
 
@@ -361,13 +361,13 @@
 
         audio.addEventListener('error', () => {
           if (playing) {
-            playNextTrack();
+            playNextTrack(); // Пробуем следующий при ошибке
           }
         });
 
         audio.addEventListener('ended', () => {
           if (playing) {
-            playNextTrack();
+            playNextTrack(); // После окончания – следующий случайный
           }
         });
 
@@ -380,11 +380,13 @@
         hint.textContent = `🎵 ${trackFile.replace(/\.mp3$/i, '')}`;
       }
 
+      // Старт плейлиста с произвольного трека
       function startPlaylist() {
         currentTrackIndex = getRandomTrackIndex(-1);
         playNextTrack();
       }
 
+      // Остановка воспроизведения
       function stopPlaylist() {
         playing = false;
         cassette.classList.remove('playing');
@@ -394,6 +396,7 @@
         stopCurrentAudio();
       }
 
+      // Обработчик кнопки «сердечко»
       heartBtn.addEventListener('click', () => {
         if (!playing) {
           playing = true;
@@ -406,7 +409,7 @@
         }
       });
 
-      // письмо
+      // Работа с письмом
       const kiss = document.getElementById('kiss');
       const loveText = document.getElementById('loveText');
       kiss.onclick = (e) => {
@@ -441,6 +444,7 @@
       let count = 0;
       let loveCount = 0;
 
+      // Восстановление счётчика "люблю тебя"
       const savedLove = JSON.parse(localStorage.getItem('loveData'));
       if (savedLove) {
         const lastResetLove = new Date(savedLove.reset);
@@ -451,6 +455,7 @@
       }
       loveCountEl.textContent = loveCount;
 
+      // Восстановление счётчика "скучаю"
       const saved = JSON.parse(localStorage.getItem('missData'));
       const now = new Date();
       if (saved) {
@@ -462,6 +467,7 @@
       }
       missCount.textContent = count;
 
+      // Таймер сброса (для отображения)
       function updateResetTimer() {
         const data = JSON.parse(localStorage.getItem('missData'));
         if (!data) return;
@@ -477,6 +483,7 @@
       setInterval(updateResetTimer, 60000);
       updateResetTimer();
 
+      // Увеличение счётчиков
       missBtn.onclick = () => {
         count++;
         missCount.textContent = count;
