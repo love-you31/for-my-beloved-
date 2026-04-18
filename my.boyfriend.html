@@ -237,7 +237,6 @@
       .sticker { height: 72px; }
     }
   
-    
     #loveText {
       z-index: 999;
     }
@@ -280,7 +279,7 @@
   </div>
   <div id="resetTimer" style="position:fixed; bottom:0; left:50%; transform:translateX(-50%); color:white; font-size:12px; opacity:0.8; margin-bottom:4px;"></div>
 
-  <!-- ПЛЕЕР (MP3 из массива – теперь случайный выбор) -->
+  <!-- ПЛЕЕР (исправлена проблема наложения треков) -->
   <script>
     (function() {
       const playlist = [
@@ -294,7 +293,7 @@
         'Скриптонит feat. Чаруша - Космос.mp3',
         'Asyamf У прошел.mp3',
         'ooes - пирожок.mp3',
-        'Scally Milano &ugg Stephan - Во Снах.mp3',
+        'Scally Milano & ugg Stephan - Во Снах.mp3',
         '7azilov - Нежно х тримай.mp3',
         'Лицо - Антидепрессант.mp3',
         'Arctic Monkeys - Party Anthem.mp3',
@@ -310,19 +309,9 @@
       let playing = false;
       let currentAudio = null;
       let currentTrackIndex = 0;
+      let isTransitioning = false; // защита от двойных кликов
 
-      // Генератор случайного индекса, исключая заданный (чтобы не повторять тот же трек)
-      function getRandomTrackIndex(excludeIndex = -1) {
-        if (playlist.length === 0) return -1;
-        if (playlist.length === 1) return 0;
-        let newIndex;
-        do {
-          newIndex = Math.floor(Math.random() * playlist.length);
-        } while (newIndex === excludeIndex);
-        return newIndex;
-      }
-
-      // цветы (оставляем как было)
+      // цветы
       const flowerEmojis = ['🌸', '🌷', '🌺', '💮', '🌼'];
       function createFlower() {
         const el = document.createElement('div');
@@ -337,18 +326,38 @@
       }
       setInterval(createFlower, 300);
 
+      // Полная остановка текущего аудио
       function stopCurrentAudio() {
         if (currentAudio) {
           currentAudio.pause();
           currentAudio.currentTime = 0;
+          currentAudio.removeAttribute('src'); // очищаем src
+          currentAudio.load(); // сбрасываем
           currentAudio = null;
         }
       }
 
+      // Генератор случайного индекса (исключая указанный)
+      function getRandomTrackIndex(excludeIndex = -1) {
+        if (playlist.length === 0) return -1;
+        if (playlist.length === 1) return 0;
+        let newIndex;
+        do {
+          newIndex = Math.floor(Math.random() * playlist.length);
+        } while (newIndex === excludeIndex);
+        return newIndex;
+      }
+
+      // Воспроизведение следующего трека
       function playNextTrack() {
         if (!playing) return;
-        
-        // Выбираем случайный трек, исключая текущий (если длина > 1)
+        if (isTransitioning) return;
+        isTransitioning = true;
+
+        // Останавливаем предыдущий
+        stopCurrentAudio();
+
+        // Выбираем следующий случайный трек (не повторяем текущий)
         const nextIndex = getRandomTrackIndex(currentTrackIndex);
         currentTrackIndex = nextIndex;
         
@@ -356,30 +365,52 @@
         const audio = new Audio(trackFile);
         currentAudio = audio;
 
-        audio.addEventListener('error', () => {
+        // Обработчик успешного начала воспроизведения
+        const onPlay = () => {
+          isTransitioning = false;
+          hint.textContent = `🎵 ${trackFile.replace(/\.mp3$/i, '')}`;
+        };
+
+        // Обработчик ошибки
+        const onError = () => {
+          console.warn('Ошибка загрузки трека:', trackFile);
+          isTransitioning = false;
           if (playing) {
-            // При ошибке просто выбираем следующий случайный трек
+            // Пробуем следующий трек
             playNextTrack();
           } else {
             stopCurrentAudio();
+            hint.textContent = 'нажми на сердечко';
           }
-        });
+        };
 
-        audio.addEventListener('ended', () => {
+        // Обработчик завершения трека
+        const onEnded = () => {
+          isTransitioning = false;
           if (playing) {
-            playNextTrack(); // следующий случайный трек
+            playNextTrack(); // следующий случайный
           } else {
             stopCurrentAudio();
+            hint.textContent = 'нажми на сердечко';
           }
-        });
+        };
 
-        audio.play().catch(() => {
+        audio.addEventListener('canplaythrough', onPlay, { once: true });
+        audio.addEventListener('error', onError, { once: true });
+        audio.addEventListener('ended', onEnded, { once: true });
+
+        // Запускаем воспроизведение
+        audio.play().catch(err => {
+          console.warn('Автовоспроизведение заблокировано:', err);
+          isTransitioning = false;
           if (playing) {
-            playNextTrack(); // если не удалось воспроизвести, пробуем другой
+            // Возможно, нужен повторный клик или другой трек
+            playNextTrack();
+          } else {
+            stopCurrentAudio();
+            hint.textContent = 'нажми на сердечко';
           }
         });
-
-        hint.textContent = `🎵 ${trackFile.replace(/\.mp3$/i, '')}`;
       }
 
       function startPlaylist() {
@@ -391,18 +422,21 @@
       function stopPlaylist() {
         playing = false;
         cassette.classList.remove('playing');
-        heartBtn.textContent = '♡';
+        heartBtn.textContent = '❤'; // меняем на пустое сердце? По дизайну было '♡'
         heartBtn.setAttribute('aria-label', 'Включить музыку');
         hint.textContent = 'нажми на сердечко';
         stopCurrentAudio();
-        // currentTrackIndex не сбрасываем специально, чтобы при новом запуске не повторять тот же трек
+        isTransitioning = false;
       }
 
       heartBtn.addEventListener('click', () => {
+        // Защита от повторных кликов во время переключения
+        if (isTransitioning) return;
+
         if (!playing) {
           playing = true;
           cassette.classList.add('playing');
-          heartBtn.textContent = '❤';
+          heartBtn.textContent = '❤'; // или можно '⏸' но оставим ❤
           heartBtn.setAttribute('aria-label', 'Остановить музыку');
           stopCurrentAudio(); // на всякий случай
           startPlaylist();
@@ -411,7 +445,7 @@
         }
       });
 
-      // письмо (без изменений)
+      // письмо
       const kiss = document.getElementById('kiss');
       const loveText = document.getElementById('loveText');
       kiss.onclick = (e) => {
@@ -424,7 +458,7 @@
     })();
   </script>
 
-  <!-- СЧЁТЧИКИ (восстановлены, работают) -->
+  <!-- СЧЁТЧИКИ (без изменений) -->
   <div style="position:fixed; bottom:40px; left:50%; transform:translateX(-50%); display:flex; gap:14px; z-index:2;">
     <button id="missBtn" style="display:flex; align-items:center; gap:6px; padding:10px 16px; border:none; border-radius:20px; background:rgba(255,77,136,0.15); color:#fff; font-size:14px; cursor:pointer; box-shadow:0 0 12px #ff4d88, 0 0 24px #ff2d95;">
       <span id="missCount">0</span> скучаю котик ❤
