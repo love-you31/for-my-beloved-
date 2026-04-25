@@ -225,6 +225,10 @@
       text-shadow: 0 1px 8px rgba(0,0,0,0.35);
     }
 
+    #loveText {
+      z-index: 999;
+    }
+
     @media (max-width: 520px) {
       .cassette { border-radius: 22px; }
       .window { height: 110px; top: 110px; }
@@ -235,10 +239,6 @@
       .slot { width: 24px; height: 42px; }
       .heart { width: 66px; height: 66px; font-size: 26px; }
       .sticker { height: 72px; }
-    }
-
-    #loveText {
-      z-index: 999;
     }
   </style>
 </head>
@@ -265,8 +265,8 @@
       <div class="sticker">𝕤𝕠𝕟𝕘𝕤 𝕗𝕠𝕣 𝕪𝕠𝕦𝕣 𝕝𝕠𝕧𝕖𝕕 𝕠𝕟𝕖</div>
 
       <div class="window">
-        <div class="reel left" id="reelLeft"></div>
-        <div class="reel right" id="reelRight"></div>
+        <div class="reel left"></div>
+        <div class="reel right"></div>
       </div>
 
       <div class="slots" aria-hidden="true">
@@ -279,6 +279,15 @@
     </div>
 
     <div class="hint" id="hint">нажми на сердечко</div>
+  </div>
+
+  <div style="position:fixed; bottom:40px; left:50%; transform:translateX(-50%); display:flex; gap:14px; z-index:2;">
+    <button id="missBtn" style="display:flex; align-items:center; gap:6px; padding:10px 16px; border:none; border-radius:20px; background:rgba(255,77,136,0.15); color:#fff; font-size:14px; cursor:pointer; box-shadow:0 0 12px #ff4d88, 0 0 24px #ff2d95;">
+      <span id="missCount">0</span> скучаю котик ❤
+    </button>
+    <button id="loveBtn" style="padding:10px 16px; border:none; border-radius:20px; background:rgba(255,77,136,0.15); color:white; font-size:14px; cursor:pointer; box-shadow:0 0 12px #ff4d88, 0 0 24px #ff2d95;">
+      люблю тебя ❤
+    </button>
   </div>
 
   <div id="resetTimer" style="position:fixed; bottom:0; left:50%; transform:translateX(-50%); color:white; font-size:12px; opacity:0.8; margin-bottom:4px;"></div>
@@ -311,11 +320,31 @@
       const hint = document.getElementById('hint');
       const flowers = document.getElementById('flowers');
       const audioPlayer = document.getElementById('audioPlayer');
+      const kiss = document.getElementById('kiss');
+      const loveText = document.getElementById('loveText');
+
+      const missBtn = document.getElementById('missBtn');
+      const missCount = document.getElementById('missCount');
+      const loveBtn = document.getElementById('loveBtn');
+      const resetTimer = document.getElementById('resetTimer');
+
+      const flowerEmojis = ['🌸', '🌷', '🌺', '💮', '🌼'];
 
       let playing = false;
       let currentTrackIndex = -1;
+      let count = 0;
+      let loveCount = 0;
 
       audioPlayer.volume = 1;
+      audioPlayer.preload = 'auto';
+
+      function safeJsonParse(value, fallback = null) {
+        try {
+          return JSON.parse(value);
+        } catch {
+          return fallback;
+        }
+      }
 
       function getRandomTrackIndex(excludeIndex = -1) {
         if (!playlist.length) return -1;
@@ -328,8 +357,6 @@
 
         return newIndex;
       }
-
-      const flowerEmojis = ['🌸', '🌷', '🌺', '💮', '🌼'];
 
       function createFlower() {
         const el = document.createElement('div');
@@ -355,8 +382,23 @@
         hint.textContent = `🎵 ${trackFile.replace(/\.mp3$/i, '')}`;
       }
 
-      async function playTrack(index) {
+      function stopPlaylist() {
+        playing = false;
+        cassette.classList.remove('playing');
+        heartBtn.textContent = '♡';
+        heartBtn.setAttribute('aria-label', 'Включить музыку');
+        hint.textContent = 'нажми на сердечко';
+        stopCurrentAudio();
+      }
+
+      async function playTrack(index, attempt = 0) {
         if (!playing || index < 0 || index >= playlist.length) return;
+
+        if (attempt > playlist.length) {
+          hint.textContent = 'не удалось найти рабочий трек';
+          stopPlaylist();
+          return;
+        }
 
         currentTrackIndex = index;
         const trackFile = playlist[currentTrackIndex];
@@ -366,17 +408,18 @@
         const src = encodeURI(trackFile);
         audioPlayer.src = src;
         audioPlayer.currentTime = 0;
+        audioPlayer.load();
 
         audioPlayer.onended = () => {
           if (!playing) return;
           const nextIndex = getRandomTrackIndex(currentTrackIndex);
-          playTrack(nextIndex);
+          playTrack(nextIndex, 0);
         };
 
         audioPlayer.onerror = () => {
           if (!playing) return;
           const nextIndex = getRandomTrackIndex(currentTrackIndex);
-          playTrack(nextIndex);
+          playTrack(nextIndex, attempt + 1);
         };
 
         updateHintByTrack(trackFile);
@@ -388,7 +431,7 @@
           heartBtn.setAttribute('aria-label', 'Остановить музыку');
         } catch (err) {
           console.error('Не удалось запустить аудио:', err);
-          hint.textContent = 'не удалось запустить трек — проверь путь к mp3';
+          hint.textContent = 'не удалось запустить трек — проверь точные имена mp3';
           stopPlaylist();
         }
       }
@@ -399,16 +442,7 @@
           return;
         }
         const firstIndex = getRandomTrackIndex(-1);
-        playTrack(firstIndex);
-      }
-
-      function stopPlaylist() {
-        playing = false;
-        cassette.classList.remove('playing');
-        heartBtn.textContent = '♡';
-        heartBtn.setAttribute('aria-label', 'Включить музыку');
-        hint.textContent = 'нажми на сердечко';
-        stopCurrentAudio();
+        playTrack(firstIndex, 0);
       }
 
       heartBtn.addEventListener('click', () => {
@@ -419,13 +453,6 @@
           stopPlaylist();
         }
       });
-
-      heartBtn.addEventListener('touchstart', (e) => {
-        e.preventDefault();
-      }, { passive: false });
-
-      const kiss = document.getElementById('kiss');
-      const loveText = document.getElementById('loveText');
 
       kiss.onclick = (e) => {
         e.stopPropagation();
@@ -438,83 +465,68 @@
       });
 
       loveText.addEventListener('click', (e) => e.stopPropagation());
-    })();
-  </script>
-
-  <div style="position:fixed; bottom:40px; left:50%; transform:translateX(-50%); display:flex; gap:14px; z-index:2;">
-    <button id="missBtn" style="display:flex; align-items:center; gap:6px; padding:10px 16px; border:none; border-radius:20px; background:rgba(255,77,136,0.15); color:#fff; font-size:14px; cursor:pointer; box-shadow:0 0 12px #ff4d88, 0 0 24px #ff2d95;">
-      <span id="missCount">0</span> скучаю котик ❤
-    </button>
-    <button id="loveBtn" style="padding:10px 16px; border:none; border-radius:20px; background:rgba(255,77,136,0.15); color:white; font-size:14px; cursor:pointer; box-shadow:0 0 12px #ff4d88, 0 0 24px #ff2d95;">
-      люблю тебя ❤
-    </button>
-  </div>
-
-  <script>
-    (function () {
-      const missBtn = document.getElementById('missBtn');
-      const missCount = document.getElementById('missCount');
-      const loveBtn = document.getElementById('loveBtn');
-      const loveCountEl = document.createElement('span');
-      loveCountEl.style.marginLeft = '6px';
-      loveBtn.appendChild(loveCountEl);
-
-      let count = 0;
-      let loveCount = 0;
-
-      const savedLove = JSON.parse(localStorage.getItem('loveData'));
-      if (savedLove) {
-        const lastResetLove = new Date(savedLove.reset);
-        const diffDaysLove = (new Date() - lastResetLove) / (1000 * 60 * 60 * 24);
-        if (diffDaysLove < 7) {
-          loveCount = savedLove.count;
-        }
-      }
-      loveCountEl.textContent = loveCount;
-
-      const saved = JSON.parse(localStorage.getItem('missData'));
-      const now = new Date();
-      if (saved) {
-        const lastReset = new Date(saved.reset);
-        const diffDays = (now - lastReset) / (1000 * 60 * 60 * 24);
-        if (diffDays < 7) {
-          count = saved.count;
-        }
-      }
-      missCount.textContent = count;
 
       function updateResetTimer() {
-        const data = JSON.parse(localStorage.getItem('missData'));
-        if (!data) return;
+        const data = safeJsonParse(localStorage.getItem('missData'));
+        if (!data || !data.reset) {
+          resetTimer.textContent = '';
+          return;
+        }
 
         const resetDate = new Date(data.reset);
         const nextReset = new Date(resetDate.getTime() + 7 * 24 * 60 * 60 * 1000);
         const diff = nextReset - new Date();
 
         if (diff <= 0) {
-          document.getElementById('resetTimer').textContent = '';
+          resetTimer.textContent = '';
           return;
         }
 
         const hours = Math.floor(diff / (1000 * 60 * 60));
         const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-        document.getElementById('resetTimer').textContent = 'сброс через: ' + hours + 'ч ' + mins + 'м';
+        resetTimer.textContent = 'сброс через: ' + hours + 'ч ' + mins + 'м';
       }
 
-      setInterval(updateResetTimer, 60000);
-      updateResetTimer();
+      const savedLove = safeJsonParse(localStorage.getItem('loveData'));
+      if (savedLove && savedLove.reset) {
+        const lastResetLove = new Date(savedLove.reset);
+        const diffDaysLove = (new Date() - lastResetLove) / (1000 * 60 * 60 * 24);
+        if (diffDaysLove < 7) {
+          loveCount = Number(savedLove.count) || 0;
+        }
+      }
+
+      const saved = safeJsonParse(localStorage.getItem('missData'));
+      if (saved && saved.reset) {
+        const lastReset = new Date(saved.reset);
+        const diffDays = (new Date() - lastReset) / (1000 * 60 * 60 * 24);
+        if (diffDays < 7) {
+          count = Number(saved.count) || 0;
+        }
+      }
+
+      missCount.textContent = count;
+
+      const loveCountEl = document.createElement('span');
+      loveCountEl.style.marginLeft = '6px';
+      loveBtn.appendChild(loveCountEl);
+      loveCountEl.textContent = loveCount;
 
       missBtn.onclick = () => {
         count++;
         missCount.textContent = count;
-        localStorage.setItem('missData', JSON.stringify({ count, reset: new Date() }));
+        localStorage.setItem('missData', JSON.stringify({ count, reset: new Date().toISOString() }));
+        updateResetTimer();
       };
 
       loveBtn.onclick = () => {
         loveCount++;
         loveCountEl.textContent = loveCount;
-        localStorage.setItem('loveData', JSON.stringify({ count: loveCount, reset: new Date() }));
+        localStorage.setItem('loveData', JSON.stringify({ count: loveCount, reset: new Date().toISOString() }));
       };
+
+      setInterval(updateResetTimer, 60000);
+      updateResetTimer();
     })();
   </script>
 </body>
