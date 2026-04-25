@@ -74,6 +74,7 @@
       box-shadow:
         0 24px 70px var(--shadow),
         inset 0 1px 0 rgba(255,255,255,0.45);
+      z-index: 2;
     }
 
     .cassette::before {
@@ -203,8 +204,9 @@
       font-size: 30px;
       line-height: 1;
       box-shadow: 0 12px 28px rgba(255, 77, 136, 0.45), inset 0 1px 0 rgba(255,255,255,0.35);
-      z-index: 2;
+      z-index: 5;
       transition: transform 0.16s ease, box-shadow 0.16s ease, filter 0.16s ease;
+      pointer-events: auto;
     }
 
     .heart:hover {
@@ -227,6 +229,37 @@
 
     #loveText {
       z-index: 999;
+    }
+
+    .progressWrap {
+      width: min(92vw, 620px);
+      margin-top: 2px;
+      z-index: 2;
+    }
+
+    .progress {
+      width: 100%;
+      height: 8px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.18);
+      overflow: hidden;
+      cursor: pointer;
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,0.12);
+    }
+
+    .bar {
+      width: 0%;
+      height: 100%;
+      border-radius: 999px;
+      background: linear-gradient(90deg, #fff, #ff4d88);
+    }
+
+    .time {
+      margin-top: 6px;
+      color: rgba(255,255,255,0.85);
+      font-size: 12px;
+      text-align: center;
+      text-shadow: 0 1px 8px rgba(0,0,0,0.35);
     }
 
     @media (max-width: 520px) {
@@ -278,6 +311,13 @@
       <button class="heart" id="heartBtn" aria-label="Включить музыку">❤</button>
     </div>
 
+    <div class="progressWrap">
+      <div class="progress" id="progress">
+        <div class="bar" id="bar"></div>
+      </div>
+      <div class="time" id="time">0:00 / 0:00</div>
+    </div>
+
     <div class="hint" id="hint">нажми на сердечко</div>
   </div>
 
@@ -320,6 +360,10 @@
       const hint = document.getElementById('hint');
       const flowers = document.getElementById('flowers');
       const audioPlayer = document.getElementById('audioPlayer');
+      const progress = document.getElementById('progress');
+      const bar = document.getElementById('bar');
+      const timeEl = document.getElementById('time');
+
       const kiss = document.getElementById('kiss');
       const loveText = document.getElementById('loveText');
 
@@ -334,6 +378,7 @@
       let currentTrackIndex = -1;
       let count = 0;
       let loveCount = 0;
+      let skipGuard = 0;
 
       audioPlayer.volume = 1;
       audioPlayer.preload = 'auto';
@@ -344,6 +389,13 @@
         } catch {
           return fallback;
         }
+      }
+
+      function formatTime(seconds) {
+        if (!isFinite(seconds) || seconds < 0) return '0:00';
+        const m = Math.floor(seconds / 60);
+        const s = Math.floor(seconds % 60);
+        return `${m}:${String(s).padStart(2, '0')}`;
       }
 
       function getRandomTrackIndex(excludeIndex = -1) {
@@ -389,13 +441,14 @@
         heartBtn.setAttribute('aria-label', 'Включить музыку');
         hint.textContent = 'нажми на сердечко';
         stopCurrentAudio();
+        bar.style.width = '0%';
+        timeEl.textContent = '0:00 / 0:00';
       }
 
-      async function playTrack(index, attempt = 0) {
+      function playTrack(index, attempt = 0) {
         if (!playing || index < 0 || index >= playlist.length) return;
-
         if (attempt > playlist.length) {
-          hint.textContent = 'не удалось найти рабочий трек';
+          hint.textContent = 'не удалось загрузить трек';
           stopPlaylist();
           return;
         }
@@ -405,10 +458,16 @@
 
         stopCurrentAudio();
 
-        const src = encodeURI(trackFile);
-        audioPlayer.src = src;
+        try {
+          audioPlayer.src = new URL(trackFile, document.baseURI).href;
+        } catch {
+          audioPlayer.src = trackFile;
+        }
+
         audioPlayer.currentTime = 0;
         audioPlayer.load();
+
+        updateHintByTrack(trackFile);
 
         audioPlayer.onended = () => {
           if (!playing) return;
@@ -418,22 +477,28 @@
 
         audioPlayer.onerror = () => {
           if (!playing) return;
+          if (skipGuard > playlist.length + 2) {
+            hint.textContent = 'проверь названия mp3';
+            stopPlaylist();
+            return;
+          }
+          skipGuard++;
           const nextIndex = getRandomTrackIndex(currentTrackIndex);
           playTrack(nextIndex, attempt + 1);
         };
 
-        updateHintByTrack(trackFile);
-
-        try {
-          await audioPlayer.play();
-          cassette.classList.add('playing');
-          heartBtn.textContent = '❤';
-          heartBtn.setAttribute('aria-label', 'Остановить музыку');
-        } catch (err) {
-          console.error('Не удалось запустить аудио:', err);
-          hint.textContent = 'не удалось запустить трек — проверь точные имена mp3';
-          stopPlaylist();
-        }
+        audioPlayer.play()
+          .then(() => {
+            skipGuard = 0;
+            cassette.classList.add('playing');
+            heartBtn.textContent = '❤';
+            heartBtn.setAttribute('aria-label', 'Остановить музыку');
+          })
+          .catch((err) => {
+            console.error('Не удалось запустить аудио:', err);
+            hint.textContent = 'не удалось запустить трек — проверь путь к mp3';
+            stopPlaylist();
+          });
       }
 
       function startPlaylist() {
@@ -465,6 +530,29 @@
       });
 
       loveText.addEventListener('click', (e) => e.stopPropagation());
+
+      function updateProgress() {
+        if (audioPlayer.duration && isFinite(audioPlayer.duration)) {
+          const percent = (audioPlayer.currentTime / audioPlayer.duration) * 100;
+          bar.style.width = Math.max(0, Math.min(100, percent)) + '%';
+          timeEl.textContent = `${formatTime(audioPlayer.currentTime)} / ${formatTime(audioPlayer.duration)}`;
+        } else {
+          bar.style.width = '0%';
+          timeEl.textContent = '0:00 / 0:00';
+        }
+      }
+
+      audioPlayer.addEventListener('timeupdate', updateProgress);
+      audioPlayer.addEventListener('loadedmetadata', updateProgress);
+      audioPlayer.addEventListener('durationchange', updateProgress);
+
+      progress.addEventListener('click', (e) => {
+        if (!audioPlayer.duration || !isFinite(audioPlayer.duration)) return;
+        const rect = progress.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const percent = Math.max(0, Math.min(1, x / rect.width));
+        audioPlayer.currentTime = percent * audioPlayer.duration;
+      });
 
       function updateResetTimer() {
         const data = safeJsonParse(localStorage.getItem('missData'));
